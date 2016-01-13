@@ -5,14 +5,13 @@ var multer = require('multer');
 var router = express.Router();
 
 var storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'public/dataset/');
-  },
-  filename: function (req, file, cb) {
-    var userID = req.params.userID; 
-    console.log(userID);
-    cb(null, userID + '_' + file.originalname);
-  }
+    destination: function (req, file, cb) {
+        var userID = req.params.userID;
+        cb(null, 'public/dataset/' + userID + '/');
+    },
+    filename: function (req, file, cb) {
+        cb(null, file.originalname);
+    }
 });
 
 var upload = multer({storage: storage});
@@ -25,9 +24,26 @@ var validPassword = function(password, valid) {
     return bcrypt.compareSync(password, valid);
 }
 
+var checkUploadPath = function(req, res, next) {
+    var uploadPath = 'public/dataset/' + userID;
+    fs.exists(uploadPath, function(exists) {
+        if(exists) {
+            next();
+        } else {
+            fs.mkdir(uploadPath, function(err) {
+                if(err) {
+                    console.log('Error in folder creation');
+                    next();
+                }
+                next();
+            });
+        }
+    });
+}
+
 /* GET home page. */
 router.get('/', function(req, res, next) {
-  res.render('index', { title: 'Express' });
+    res.render('index', { title: 'Express' });
 });
 
 router.post('/signup', function(req, res, next) {
@@ -53,7 +69,7 @@ router.post('/signup', function(req, res, next) {
                     console.log(error);
                     res.send({state: 'error', reason: error});
                 }
-                res.send({state: 'OK'});
+                res.send({state: 'OK', userID: newUser._id});
             });
         }
     });
@@ -82,12 +98,12 @@ router.post('/signin', function(req, res, next) {
     });
 });
 
-router.post('/dataset/:userID', upload.single('dataset'), function(req, res, next) {
+router.post('/dataset/:userID', checkUploadPath, upload.array('dataset', 50), function(req, res, next) {
     res.send({state: 'OK'});
 });
 
-router.get('/dataset/:fileName', function(req, res, next) {
-    res.download('public/dataset/' + req.params.fileName);
+router.get('/dataset/:userID/:fileName', function(req, res, next) {
+    res.download('public/dataset/' + req.params.userID + '/' + req.params.fileName);
 });
 
 module.exports = router;
